@@ -1,0 +1,37 @@
+import serial
+import csv
+
+# --- SETTINGS ---
+PORT = 'COM3' 
+LABEL = 1  # <--- Change this to 1 for your second run!
+
+ser = serial.Serial(PORT, 9600, timeout=1)
+print(f"Connected to {PORT}. Recording Label {LABEL}...")
+
+with open("data.csv", "a", newline="") as f:
+    writer = csv.writer(f)
+    count = 0
+    while count < 300:
+        line = ser.readline().decode('utf-8', errors='ignore').strip()
+        
+        # This splits the data by commas or spaces
+        parts = line.replace('|', ',').replace(':', ',').split(',')
+        
+        # Clean the data (remove empty strings and text)
+        numeric_parts = []
+        for p in parts:
+            try:
+                numeric_parts.append(float(p))
+            except:
+                continue
+        
+        # If we found at least 2 numbers (IR and RED), save them!
+        if len(numeric_parts) >= 2:
+            row = numeric_parts + [LABEL]
+            writer.writerow(row)
+            count += 1
+            if count % 10 == 0:
+                print(f"Captured {count}/300 rows...")
+
+print(f"✅ Label {LABEL} Finished!")
+ser.close()

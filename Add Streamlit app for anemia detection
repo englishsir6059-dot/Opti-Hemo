@@ -1,0 +1,65 @@
+import streamlit as st
+import serial
+import time
+
+# 1. Setup Page
+st.set_page_config(page_title="Anemia Detector", layout="wide")
+st.title("🩸 Threshold-Based Anemia Detection")
+
+# 2. Hardware Connection
+if 'ser' not in st.session_state:
+    try:
+        # Check COM port in Device Manager
+        st.session_state.ser = serial.Serial('COM3', 9600, timeout=0)
+        st.success("✅ Hardware Online")
+    except:
+        st.error("❌ Connection Error: Check COM3.")
+
+if 'history' not in st.session_state:
+    st.session_state.history = []
+
+# --- 3. THE DASHBOARD ---
+col1, col2 = st.columns([1, 1])
+with col1:
+    val_metric = st.empty()
+    chart_display = st.empty()
+with col2:
+    diagnosis_box = st.empty()
+    st.info("💡 Threshold: < 80k = Anemic | > 80k = Healthy")
+
+# --- 4. THE INSTANT ENGINE ---
+if st.button('🚀 START SCAN'):
+    while True:
+        try:
+            if st.session_state.ser:
+                # Flush to keep it instant
+                if st.session_state.ser.in_waiting > 500:
+                    st.session_state.ser.reset_input_buffer()
+
+                line = st.session_state.ser.readline().decode('utf-8', errors='ignore').strip()
+                
+                if line:
+                    # Parse the IR value
+                    parts = line.split(',')
+                    val = float(parts[0].strip())
+
+                    # A. Update Metric & Graph
+                    val_metric.metric("Live IR Value", int(val))
+                    
+                    st.session_state.history.append(val)
+                    if len(st.session_state.history) > 50:
+                        st.session_state.history.pop(0)
+                    
+                    chart_display.line_chart(st.session_state.history)
+
+                    # B. YOUR SPECIFIC THRESHOLD LOGIC
+                    if val < 30000: # Finger is likely off the sensor
+                        diagnosis_box.warning("⌛ Sensor waiting for finger...")
+                    elif val < 80000: # BELOW 80,000
+                        diagnosis_box.error("🚨 RESULT: ANEMIA DETECTED")
+                    else: # ABOVE 80,000
+                        diagnosis_box.success("✅ RESULT: NON-ANEMIC (HEALTHY)")
+            
+            time.sleep(0.01)
+        except Exception:
+            continue
